@@ -1,0 +1,308 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<title>HTML5 Audio Player with Playlist by Tean</title>
+        
+		<link rel="stylesheet" type="text/css" href="css/jquery.jscrollpane.css" media="all" />
+		<link rel="stylesheet" type="text/css" href="css/html5audio3.css" />
+        
+		<script type="text/javascript" src="js/jquery-1.7.min.js"></script>
+        <script type="text/javascript" src="js/jquery.easing.1.3.js"></script>
+        <script type="text/javascript" src="js/jquery.mousewheel.min.js"></script>
+        <script type="text/javascript" src="js/jquery.jscrollpane.min.js"></script>
+        <script type="text/javascript" src="js/soundmanager2-nodebug-jsmin.js" ></script>
+		<script type="text/javascript" src="js/jquery.html5audio.min.js"></script>
+        <script type="text/javascript" src="js/jquery.apPlaylistManager.min.js"></script>
+        <script type="text/javascript" src="js/jquery.apTextScroller.min.js"></script>
+        <script type="text/javascript">
+			
+			function audioPlayerSetupDone(){
+				/* This will get called when component is ready to receive public function calls. */
+				//console.log('audioPlayerSetupDone');
+			}
+			
+			// SETTINGS
+			var ap_settings = {
+				/*defaultVolume: 0-1 */
+				defaultVolume:0.5,
+				/*autoPlay: true/false (false on mobile by default) */
+				autoPlay:true,
+				/*autoPlayAfterFirst: true/false (if autoPlay=false, after first song play, autoPlay=true) */
+				autoPlayAfterFirst:true,
+				/*randomPlay: true/false */
+				randomPlay:false,
+				/*loopingOn: true/false (loop on the end of the playlist) */
+				loopingOn:true,
+				/* autoOpenPlaylist: true/false. Auto open playlist on beginning. Set this to false if you dont want to use (visible) playlist. */
+				autoOpenPlaylist: false,
+				/* addNumbersInPlaylist: true/false. Prepend numbers in playlist items. */
+				addNumbersInPlaylist: true,
+				/* useSongNameScroll: true/false. Use song name scrolling. */
+				useSongNameScroll: true,
+				/* scrollSeparator: String to append between scrolling song name. */
+				scrollSeparator: '&nbsp;&#42;&#42;&#42;&nbsp;',
+				/* mediaTimeSeparator: String between current and total song time. */
+				mediaTimeSeparator: '&nbsp;-&nbsp;',
+				/* seekTooltipSeparator: String between current and total song position. */
+				seekTooltipSeparator: '&nbsp;/&nbsp;',
+				/* scrollSpeed: speed of the scroll. */
+				scrollSpeed: 1,
+				/* activePlaylist: set active playlist that will be loaded on beginning (pass element 'id' attributte) */
+				activePlaylist: 'playlist1',
+				/* soundcloudApiKey: register you own api key here for free : http://soundcloud.com/you/apps/new and enter Client ID */
+				soundcloudApiKey: '',
+				/* buttonsUrl: url of the buttons for normal and rollover state (rollover state is optional), so I dont hardcode them in jquery. */
+				buttonsUrl: {prev: 'media/data/icons/set1/prev.png', prevOn: 'media/data/icons/set1/prev_on.png', 
+						  	 next: 'media/data/icons/set1/next.png', nextOn: 'media/data/icons/set1/next_on.png', 
+						 	 pause: 'media/data/icons/set1/pause.png', pauseOn: 'media/data/icons/set1/pause_on.png',
+						 	 play: 'media/data/icons/set1/play.png', playOn: 'media/data/icons/set1/play_on.png',
+						 	 volume: 'media/data/icons/set1/volume.png', volumeOn: 'media/data/icons/set1/volume_on.png', 
+							 mute: 'media/data/icons/set1/mute.png', muteOn: 'media/data/icons/set1/mute_on.png', 
+						  	 loop: 'media/data/icons/set1/loop.png', loopOn: 'media/data/icons/set1/loop_on.png',
+						  	 shuffle: 'media/data/icons/set1/shuffle.png', shuffleOn: 'media/data/icons/set1/shuffle_on.png',
+						  	 playlist: 'media/data/icons/set1/playlist.png', playlistOn: 'media/data/icons/set1/playlist_on.png'}
+			};
+			
+			//sound manager settings (http://www.schillmania.com/projects/soundmanager2/)
+			soundManager.allowScriptAccess = 'always';
+			soundManager.debugMode = false;
+			soundManager.noSWFCache = true;
+			soundManager.useConsole = false;
+			soundManager.waitForWindowLoad = true;
+			soundManager.url = 'swf/';
+			soundManager.flashVersion = 9;
+			soundManager.preferFlash = false; // use HTML5 audio for MP3/MP4, if available
+			soundManager.useHTML5Audio = true;
+			
+			var audio = document.createElement('audio'), mp3Support, oggSupport;
+			if (audio.canPlayType) {
+			   mp3Support = !!audio.canPlayType && "" != audio.canPlayType('audio/mpeg');
+			   oggSupport = !!audio.canPlayType && "" != audio.canPlayType('audio/ogg; codecs="vorbis"');
+			}else{
+				//for IE<9
+				mp3Support = true;
+				oggSupport = false;
+			}
+			//console.log('mp3Support = ', mp3Support, ' , oggSupport = ', oggSupport);
+			
+			/*
+			FF - false, true
+			OP - false, true
+			
+			IE9 - true, false 
+			SF - true, false 
+			
+			CH - true, true
+			*/
+			
+		    soundManager.audioFormats = {
+			  'mp3': {
+				'type': ['audio/mpeg; codecs="mp3"', 'audio/mpeg', 'audio/mp3', 'audio/MPA', 'audio/mpa-robust'],
+				'required': mp3Support
+			  },
+			  'mp4': {
+				'related': ['aac','m4a'], // additional formats under the MP4 container
+				'type': ['audio/mp4; codecs="mp4a.40.2"', 'audio/aac', 'audio/x-m4a', 'audio/MP4A-LATM', 'audio/mpeg4-generic'],
+				'required': false
+			  },
+			  'ogg': {
+				'type': ['audio/ogg; codecs=vorbis'],
+				'required': oggSupport
+			  },
+			  'wav': {
+				'type': ['audio/wav; codecs="1"', 'audio/wav', 'audio/wave', 'audio/x-wav'],
+				'required': false
+			  }
+			};
+			
+			jQuery(window).load(function() {
+				jQuery.noConflict();
+				
+				jQuery('#m2').children('a').css({
+				   background : '#ccc',
+				   cursor : 'default'
+				});
+				
+				//init component
+			    jQuery.html5audio('#componentWrapper', ap_settings, 'sound_id1');
+			    ap_settings = null;
+    	    });
+		
+        </script>
+        
+	</head>
+	<body>
+         
+         <div id="previewInfo">
+             <ul>
+                <li><a href='#' onClick="jQuery.html5audio.inputPlaylist('playlist1'); return false;">Load local playlist 1</a></li>
+                <li><a href='#' onClick="jQuery.html5audio.inputPlaylist('playlist2'); return false;">Load local playlist 2</a></li>
+                
+                <li><a href='#' onClick="jQuery.html5audio.inputPlaylist('playlist3'); return false;">Load podcast from gidilounge.fm</a><br/><a href="http://gidilounge.fm/?feed=podcast" target="_blank">http://gidilounge.fm/?feed=podcast</a></li>
+                <li><a href='#' onClick="jQuery.html5audio.inputPlaylist('playlist4'); return false;">Load podcast from kingola.com</a><br/><a href="http://www.kingola.com/feed/podcast/" target="_blank">http://www.kingola.com/feed/podcast/</a></li>
+                <li><a href='#' onClick="jQuery.html5audio.inputPlaylist('playlist5'); return false;">Load podcast from npr.org</a><br/><a href="http://www.npr.org/rss/podcast.php?id=5197069" target="_blank">http://www.npr.org/rss/podcast.php?id=5197069</a></li>
+                <li><a href='#' onClick="jQuery.html5audio.inputPlaylist('playlist6'); return false;">Load podcast feedburner.com</a><br/><a href="http://feeds.feedburner.com/xpnmusicnotes/" target="_blank">http://feeds.feedburner.com/xpnmusicnotes/</a></li>
+                <li><a href='#' onClick="jQuery.html5audio.inputPlaylist('playlist7'); return false;">Load podcast robertkelly.libsyn.com</a><br/><a href="http://robertkelly.libsyn.com/rss" target="_blank">http://robertkelly.libsyn.com/rss</a></li>
+                
+                <li><a href='#' onClick="jQuery.html5audio.inputPlaylist('playlist8'); return false;">Load Soundcloud track set</a><br/><a href="http://soundcloud.com/trance/sets/magix-revolta-2/" target="_blank">http://soundcloud.com/trance/sets/magix-revolta-2/</a></li>
+                <li><a href='#' onClick="jQuery.html5audio.inputPlaylist('playlist9'); return false;">Load Soundcloud user tracks</a><br/><a href="http://soundcloud.com/computer-magic" target="_blank">http://soundcloud.com/computer-magic</a></li>
+                <li><a href='#' onClick="jQuery.html5audio.inputPlaylist('playlist10'); return false;">Load Soundcloud single track</a><br/><a href="http://soundcloud.com/trance/trance-single-138-bpm-anvil" target="_blank">http://soundcloud.com/trance/trance-single-138-bpm-anvil</a></li>
+                <li><a href='#' onClick="jQuery.html5audio.inputPlaylist('playlist11'); return false;">Load Soundcloud user favourites</a><br/><a href="http://soundcloud.com/mixessss/favorites" target="_blank">http://soundcloud.com/mixessss/favorites</a></li>
+             </ul>
+        </div>
+         
+        <div id="previewMenu">
+             <ul>
+                 <li><a href="index.html" target="_parent">EXAMPLE 1</a></li>
+                 <li><a href="index2.html" target="_parent">EXAMPLE 2</a></li>
+                 <li id='m2'><a href="index3.html" target="_parent">EXAMPLE 3</a></li>
+                 <li><a href="index4.html" target="_parent">EXAMPLE 4</a></li>
+                 <li><a href="index5.html" target="_parent">EXAMPLE 5</a></li>
+             </ul>
+        </div>
+
+
+        <!-- wrapper for the whole component -->
+    	<div id="componentWrapper">
+        
+        	 <!-- for audio code -->
+        	 <div class="audioHolder"></div>	
+        
+             <div class="playerHolder">
+                 
+                  <div class="player_controls">
+                  	  <!-- previous -->
+                      <div class="controls_prev"><img src='media/data/icons/set1/prev.png' width='24' height='24' alt='controls_prev'/></div>
+                      <!-- pause/play -->
+                      <div class="controls_toggle"><img src='media/data/icons/set1/play.png' width='24' height='24' alt='controls_toggle'/></div>
+                      <!-- next -->
+                      <div class="controls_next"><img src='media/data/icons/set1/next.png' width='24' height='24' alt='controls_next'/></div>
+                  </div>
+                  
+                  <!-- progress -->
+                  <div class="player_progress">
+                      <div class="progress_bg"></div>
+                      <div class="load_level"></div>
+                      <div class="progress_level"></div>
+                  </div>
+                  
+                  <!-- volume tooltip -->
+                  <div class="player_volume_tooltip">
+                      <div class="player_volume_tooltip_value">0</div>
+                  </div>
+                  
+                  <!-- progress tooltip -->
+                  <div class="player_progress_tooltip">
+                      <div class="player_progress_tooltip_value">0:00&nbsp;/&nbsp;0:00</div>
+                  </div>
+             
+              </div>
+              
+              <div class="playlistHolder">
+             
+                 <div class="componentPlaylist">
+                	 <!-- playlist_inner: container for scroll -->
+                     <div class="playlist_inner">
+                     
+                     <!-- List of playlists. NO EXTENSION for music file names! -->
+                     
+                     	 <!-- local playlist -->
+                         <ul id='playlist1' data-type='local'>
+                             <li class= "playlistItem" data-path="media/audio/1/adg3com_bustedchump" ><a class="playlistNonSelected" href='#'>adg3com_bustedchump</a></li>
+                             <li class= "playlistItem" data-path="media/audio/1/adg3com_chuckedknuckles" ><a class="playlistNonSelected" href='#'>adg3com_chuckedknuckles</a></li>
+                             <li class= "playlistItem" data-path="media/audio/1/adg3com_cloudlessdays" ><a class="playlistNonSelected" href='#'>adg3com_cloudlessdays</a></li>
+                             <li class= "playlistItem" data-path="media/audio/1/adg3com_coreissues" ><a class="playlistNonSelected" href='#'>adg3com_coreissues</a></li>
+                             <li class= "playlistItem" data-path="media/audio/1/adg3com_crypticpsyche" ><a class="playlistNonSelected" href='#'>adg3com_crypticpsyche</a></li>
+                             <li class= "playlistItem" data-path="media/audio/1/adg3com_electrofreak" ><a class="playlistNonSelected" href='#'>adg3com_electrofreak</a></li>
+                             <li class= "playlistItem" data-path="media/audio/1/adg3com_freeform" ><a class="playlistNonSelected" href='#'>adg3com_freeform</a></li>
+                         </ul>
+                         
+                         <!-- local playlist -->
+                         <ul id='playlist2' data-type='local'>
+                             <li class= "playlistItem" data-path="media/audio/2/wm_far_away" ><a class="playlistNonSelected" href='#'>wm_far_away</a></li>
+                             <li class= "playlistItem" data-path="media/audio/2/wm_follow_me" ><a class="playlistNonSelected" href='#'>wm_follow_me</a></li>
+                             <li class= "playlistItem" data-path="media/audio/2/wm_ghetto_funk" ><a class="playlistNonSelected" href='#'>wm_ghetto_funk</a></li>
+                             <li class= "playlistItem" data-path="media/audio/2/wm_krazy_dance_mega_mix" ><a class="playlistNonSelected" href='#'>wm_krazy_dance_mega_mix</a></li>
+                             <li class= "playlistItem" data-path="media/audio/2/wm_rock_the_show" ><a class="playlistNonSelected" href='#'>wm_rock_the_show</a></li>
+                             <li class= "playlistItem" data-path="media/audio/2/wm_spacekeys" ><a class="playlistNonSelected" href='#'>wm_spacekeys</a></li>
+                             <li class= "playlistItem" data-path="media/audio/2/wm_superlate" ><a class="playlistNonSelected" href='#'>wm_superlate</a></li>
+                         </ul>
+                         
+                         <!-- examples of podcast playlists -->
+                         <ul id='playlist3' data-type='podcast' data-path='http://gidilounge.fm/?feed=podcast'></ul>
+                         <ul id='playlist4' data-type='podcast' data-path='http://www.kingola.com/feed/podcast/'></ul>
+                         <ul id='playlist5' data-type='podcast' data-path='http://www.npr.org/rss/podcast.php?id=5197069'></ul>
+                         <ul id='playlist6' data-type='podcast' data-path='http://feeds.feedburner.com/xpnmusicnotes/'></ul>
+                         <ul id='playlist7' data-type='podcast' data-path='http://robertkelly.libsyn.com/rss'></ul>
+                         
+                         <!-- Soundcloud playlists -->
+                         <!-- track set -->
+                         <ul id='playlist8' data-type='soundcloud' data-path='http://soundcloud.com/trance/sets/magix-revolta-2/' ></ul>
+                         <!-- user tracks -->
+                         <ul id='playlist9' data-type='soundcloud' data-path='http://soundcloud.com/computer-magic' ></ul>
+                         <!-- single track -->
+                         <ul id='playlist10' data-type='soundcloud' data-path='http://soundcloud.com/trance/trance-single-138-bpm-anvil' ></ul>
+                         <!-- user favorites -->
+                         <ul id='playlist11' data-type='soundcloud' data-path='http://soundcloud.com/mixessss/favorites' ></ul>
+                         
+                     </div>
+                 </div>
+                
+                 <!-- for parsing podcast feeds -->
+                 <div class="feedParser"></div>
+             
+             </div>
+             
+             <!-- font calculations -->
+       		 <div class="fontMeasure"></div>
+        
+        </div>
+        
+   		<!-- public function calls -->
+    	<div id='publicFunctions'>
+       		<p>PUBLIC METHODS</p><br/>
+            <ul>
+                <!-- play active media -->
+                <li><a href='#' onClick="jQuery.html5audio.playAudio(); return false;">Play current media</a></li>
+                
+                <!-- stop active media -->
+                <li><a href='#' onClick="jQuery.html5audio.stopAudio(); return false;">Pause current media</a></li>
+                
+                <!-- play next media -->
+                <li><a href='#' onClick="jQuery.html5audio.nextAudio(); return false;">Play next</a></li>
+                
+                <!-- play previous media -->
+                <li><a href='#' onClick="jQuery.html5audio.previousAudio(); return false;">Play previous</a></li>
+                
+                <!-- play media number -->
+                <li><a href='#' onClick="jQuery.html5audio.loadAudio(2); return false;">Play media number 2</a></li>
+                
+                <!-- toggle playlist -->
+                <li><a href='#' onClick="jQuery.html5audio.togglePlaylistState(); return false;">Toggle playlist</a></li>
+                
+                <!-- toggle shuffle -->
+                <li><a href='#' onClick="jQuery.html5audio.toggleShuffle(); return false;">Toggle shuffle</a></li>
+                
+                <!-- toggle loop -->
+                <li><a href='#' onClick="jQuery.html5audio.toggleLoop(); return false;">Toggle loop</a></li>
+                
+                <!-- set volume (0-1) -->
+                <li><a href='#' onClick="jQuery.html5audio.setVolume(0.5); return false;">Set volume (0.5)</a></li>
+                
+                <!-- load new playlist (pass element id) -->
+                <li><a href='#' onClick="jQuery.html5audio.inputPlaylist('playlist1'); return false;">Load playlist 1</a></li>
+
+                <!-- load new playlist (pass element id) -->
+                <li><a href='#' onClick="jQuery.html5audio.inputPlaylist('playlist2'); return false;">Load playlist 2</a></li>
+                
+                <!-- destroy audio -->
+                <li><a href='#' onClick="jQuery.html5audio.destroyAudio(); return false;">Destroy audio</a></li>
+                
+                <!-- reinitialize scroll (check help for more info when to use this) 
+                <li><a href='#' onClick="jQuery.html5audio.reinitScroll(); return false;">Reinitialize scroll</a></li>-->
+            </ul>
+         </div>
+	
+	</body>
+</html>
